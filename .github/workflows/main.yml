@@ -16,6 +16,7 @@ env:
     ALLOW_UNAUTHENTICATED: true
     DOMAIN: tms
     SUB_DOMAIN: example
+    BASE_PATH: cm/tms-auth-ms/v1
 jobs:
     build_and_deploy:
         runs-on: ubuntu-latest
@@ -57,6 +58,11 @@ jobs:
                 echo "PORT=8080" >> ${{ env.ENV_FILE }}
                 echo "VERSION=v1" >> ${{ env.ENV_FILE }}
                 echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
+                echo "BASE_PATH=${{ env.BASE_PATH }}" >> ${{ env.ENV_FILE }}
+                # Añadir variable para evitar autenticación en desarrollo
+                echo "DISABLE_AUTH=true" >> ${{ env.ENV_FILE }}
+                # Añadir variable para permitir CORS desde cualquier origen
+                echo "CORS_ORIGIN=*" >> ${{ env.ENV_FILE }}
                 cp ${{ env.ENV_FILE }} .env
                 
                 # Imprimir las variables no sensibles del archivo .env
@@ -70,7 +76,7 @@ jobs:
                 
                 # Verificar que variables específicas importantes existen
                 echo "Verificando variables importantes:"
-                for VAR in PORT SERVICE_NAME ENV VERSION; do
+                for VAR in PORT SERVICE_NAME ENV VERSION BASE_PATH; do
                   if grep -q "^$VAR=" ${{ env.ENV_FILE }}; then
                     echo "✅ $VAR está definida"
                     grep "^$VAR=" ${{ env.ENV_FILE }}
@@ -106,8 +112,29 @@ jobs:
             - name: Build y push de Docker
               run: |
                 echo "Construyendo imagen Docker localmente..."
+                # Verificando la estructura del proyecto
+                echo "Estructura del directorio:"
+                ls -la
+                
+                echo "Contenido de dist:"
+                ls -la dist/ || echo "dist/ no existe!"
+                
+                # Verificando package.json
+                echo "Scripts en package.json:"
+                grep -A 10 "scripts" package.json
+                
                 # Autenticar Docker con Google Container Registry
                 gcloud auth configure-docker --quiet
+                
+                # Modificar Dockerfile para usar npm start
+                if grep -q 'CMD \["node"' Dockerfile; then
+                  echo "Actualizando CMD en Dockerfile para usar npm start..."
+                  sed -i 's/CMD \["node".*\]/CMD \["npm", "start"\]/' Dockerfile
+                fi
+                
+                # Imprimir Dockerfile para depuración
+                echo "Contenido del Dockerfile:"
+                cat Dockerfile
                 
                 # Construir y enviar la imagen directamente con Docker
                 docker build -t gcr.io/${{ env.PROJECT_ID }}/esteban-${{ env.SERVICE_NAME }}:${{ github.sha }} .
@@ -138,12 +165,43 @@ jobs:
                   --timeout 5m \
                   --cpu 1 \
                   --memory 512Mi \
-                  --set-env-vars "$ENV_VARS"
+                  --set-env-vars "$ENV_VARS" \
+                  --ingress=all
+                
+                echo "Configurando permisos IAM explícitamente..."
+                gcloud run services add-iam-policy-binding esteban-$SERVICE_NAME \
+                  --region=$REGION \
+                  --member=allUsers \
+                  --role=roles/run.invoker || echo "No se pudieron establecer permisos IAM - el servicio podría requerir autenticación"
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.PROJECT_ID }}
                 
-            - name: Get URL Cloud Run
-              shell: bash
-              run: echo "url=$(gcloud run services describe esteban-$SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)')" >> $GITHUB_OUTPUT
-              id: extract_url
+            - name: Verificar el servicio desplegado
+              run: |
+                echo "Obteniendo URL del servicio..."
+                SERVICE_URL=$(gcloud run services describe esteban-$SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)')
+                echo "URL del servicio: $SERVICE_URL"
+                
+                echo "Verificando respuesta del servicio (ruta raíz)..."
+                curl -v $SERVICE_URL || echo "Error al acceder a la ruta raíz"
+                
+                echo "Verificando respuesta de la ruta autenticación..."
+                curl -v $SERVICE_URL/${{ env.BASE_PATH }}/autenticacion/ || echo "Error al acceder a la ruta de autenticación"
+                
+                echo "Intentando con credenciales simuladas..."
+                curl -v $SERVICE_URL/${{ env.BASE_PATH }}/autenticacion/ \
+                  -H "Content-Type: application/json" \
+                  -d '{"username":"test","password":"test"}' || echo "Error al acceder con credenciales"
+                
+                echo "Verificando logs del servicio para identificar problemas..."
+                gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=esteban-$SERVICE_NAME AND severity>=WARNING" --limit=20
+                
+                echo "Verificando configuración del servicio..."
+                gcloud run services describe esteban-$SERVICE_NAME --platform managed --region $REGION
+                
+                echo "URL del servicio desplegado: $SERVICE_URL"
+              env:
+                GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
+                CLOUDSDK_CORE_PROJECT: ${{ env.PROJECT_ID }}
+              if: always()  # Ejecutar incluso si pasos anteriores fallan
