@@ -19,7 +19,7 @@ const swaggerUiOptions = {
 }
 
 export default class FastifyServer implements IServer {
-    port: number = +ENV.PORT
+    port = 8080
 
     app: FastifyInstance
 
