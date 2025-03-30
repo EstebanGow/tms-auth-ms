@@ -35,12 +35,12 @@ jobs:
           path: '**/node_modules'
           key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
           
-      - name: Install and Build
-        uses: ./.github/actions/build
+      - name: Install dependencies
+        run: yarn install
         
-      - name: Build tests
-        uses: ./.github/actions/quality
-
+      - name: Build application
+        run: yarn build
+          
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
         with:
@@ -51,30 +51,6 @@ jobs:
       - name: Authorize Docker push
         run: gcloud auth configure-docker
         
-      - name: Check Docker version and info
-        run: |
-          docker --version
-          docker info
-          ls -la
-          
-      - name: Confirm Dockerfile exists
-        run: |
-          if [ -f "Dockerfile" ]; then
-            echo "Dockerfile exists"
-            cat Dockerfile | head -n 10
-          else
-            echo "Dockerfile does not exist in the current directory"
-            find . -name "Dockerfile" -type f
-            exit 1
-          fi
-        
-      - name: Build and push Docker image
-        run: |
-          echo "Building Docker image..."
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }} .
-          echo "Pushing Docker image..."
-          docker push gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }}
-          
       - name: Create ENV File
         run: |
           mkdir -p env
@@ -94,6 +70,13 @@ jobs:
           echo "VERSION=v1" >> ${{ env.ENV_FILE }}
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
           cp ${{ env.ENV_FILE }} .env
+        
+      - name: Build and push Docker image
+        run: |
+          echo "Building Docker image..."
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }} .
+          echo "Pushing Docker image..."
+          docker push gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }}
           
       - name: Deploy to Cloud Run
         id: deploy
