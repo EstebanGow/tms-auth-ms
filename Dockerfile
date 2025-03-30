@@ -15,4 +15,4 @@ RUN cat ./dist/index.js | head -n 10
 EXPOSE 8080
 USER node
 
-CMD ["npm", "start"]
+CMD ["yarn", "start"]
