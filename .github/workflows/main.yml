@@ -67,7 +67,7 @@ jobs:
                 echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
                 cp ${{ env.ENV_FILE }} .env
             - name: Set up Cloud SDK
-              uses: google-github-actions/setup-gcloud@master
+              uses: google-github-actions/setup-gcloud@v1
               with:
                   project_id: ${{ env.GCP_PROJECT }}
                   service_account_key: ${{ secrets.GCP_SA_KEY }}
