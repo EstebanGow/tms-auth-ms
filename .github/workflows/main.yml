@@ -54,6 +54,7 @@ jobs:
                 echo "POSTGRES_DATABASE=${{ secrets.POSTGRES_DATABASE }}" >> ${{ env.ENV_FILE }}
                 echo "PREFIX_LOGGER=cm" >> ${{ env.ENV_FILE }}
                 echo "LOGGER_LEVEL=debug" >> ${{ env.ENV_FILE }}
+                echo "PORT=8080" >> ${{ env.ENV_FILE }}
                 echo "VERSION=v1" >> ${{ env.ENV_FILE }}
                 echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
                 cp ${{ env.ENV_FILE }} .env
@@ -111,11 +112,9 @@ jobs:
                   --region $REGION \
                   --max-instances 2 \
                   --platform managed \
-                  --port 8080 \
                   --timeout 5m \
                   --cpu 1 \
                   --memory 512Mi \
-                  --set-env-vars "$ENV_VARS"
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.PROJECT_ID }}
