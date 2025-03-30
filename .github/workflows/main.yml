@@ -92,21 +92,18 @@ jobs:
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
             - name: Deploy to Cloud Run
               run: |
-                echo "Configurando permisos de IAM para Cloud Run..."
-                # Intentar configurar los permisos de IAM para allUsers
-                gcloud run services add-iam-policy-binding \
-                  --region=$REGION \
-                  --member=allUsers \
-                  --role=roles/run.invoker \
-                  yohan-$SERVICE_NAME || true
-                  
                 echo "Desplegando a Cloud Run..."
                 gcloud run deploy yohan-$SERVICE_NAME \
                   --image gcr.io/${{ env.GCP_PROJECT }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }} \
                   --allow-unauthenticated \
                   --region $REGION \
                   --max-instances 2 \
-                  --platform managed
+                  --platform managed \
+                  --port 8080 \
+                  --timeout 5m \
+                  --cpu 1 \
+                  --memory 512Mi \
+                  --set-env-vars "PORT=8080"
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
