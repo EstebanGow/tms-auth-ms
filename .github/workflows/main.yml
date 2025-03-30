@@ -88,8 +88,8 @@ jobs:
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
             - name: Deploy to Cloud Run
               run: |-
-                  gcloud run deploy yohan-$SERVICE_NAME \
-                    --image gcr.io/${{ env.GCP_PROJECT }}/yohan-$SERVICE_NAME:${{ github.sha }} \
+                  gcloud run deploy esteban-$SERVICE_NAME \
+                    --image gcr.io/${{ env.GCP_PROJECT }}/esteban-$SERVICE_NAME:${{ github.sha }} \
                     --allow-unauthenticated \
                     --region $REGION \
                     --max-instances 2
