@@ -1,23 +1,15 @@
-FROM node:20
+FROM node:16-alpine
 
-# Crear directorio de la aplicación
-RUN mkdir -p /usr/src/app
-WORKDIR /usr/src/app
+WORKDIR /root/
 
-# Copiar package.json y yarn.lock
 COPY package.json yarn.lock ./
 
-# Instalar dependencias
-RUN yarn install
+RUN yarn install --production=true
 
-# Copiar el código fuente
-COPY . .
-
-# Compilar la aplicación
-RUN yarn build
-
-# Exponer puerto
+COPY ./dist ./dist/
 EXPOSE 8080
+USER node
 
-# Comando para iniciar la aplicación
-CMD ["node", "dist/main.js"]
+COPY .env ./
+
+CMD [ "yarn", "start" ]
