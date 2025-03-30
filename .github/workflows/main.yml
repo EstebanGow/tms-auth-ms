@@ -58,6 +58,26 @@ jobs:
                 echo "VERSION=v1" >> ${{ env.ENV_FILE }}
                 echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> ${{ env.ENV_FILE }}
                 cp ${{ env.ENV_FILE }} .env
+                
+                # Imprimir las variables no sensibles del archivo .env
+                echo "============ Contenido del archivo .env (variables no sensibles) ============"
+                cat ${{ env.ENV_FILE }} | grep -v "SECRET\|PASS\|USER\|HOST\|DATABASE" || echo "No se pudieron mostrar variables no sensibles"
+                echo "==========================================================================="
+                
+                # Contar el número total de variables definidas
+                TOTAL_VARS=$(cat ${{ env.ENV_FILE }} | grep -v "^#" | wc -l)
+                echo "Total de variables definidas en ${{ env.ENV_FILE }}: $TOTAL_VARS"
+                
+                # Verificar que variables específicas importantes existen
+                echo "Verificando variables importantes:"
+                for VAR in PORT SERVICE_NAME ENV VERSION; do
+                  if grep -q "^$VAR=" ${{ env.ENV_FILE }}; then
+                    echo "✅ $VAR está definida"
+                    grep "^$VAR=" ${{ env.ENV_FILE }}
+                  else
+                    echo "❌ $VAR NO está definida"
+                  fi
+                done
             - name: Set up Cloud SDK
               uses: google-github-actions/setup-gcloud@v1
               with:
@@ -105,6 +125,9 @@ jobs:
                 
                 ENV_VARS=$(grep -v '^#' ${{ env.ENV_FILE }} | grep -v "^PORT=" | tr '\n' ',' | sed 's/,$//')
                 
+                echo "Variables que se pasarán a Cloud Run (formato filtrado):"
+                echo "$ENV_VARS" | tr ',' '\n' | grep -v "SECRET\|PASS\|USER\|HOST\|DATABASE" || echo "No hay variables no sensibles"
+                
                 echo "Desplegando a Cloud Run con variables de entorno..."
                 gcloud run deploy esteban-$SERVICE_NAME \
                   --image gcr.io/${{ env.PROJECT_ID }}/esteban-${{ env.SERVICE_NAME }}:${{ github.sha }} \
@@ -115,6 +138,7 @@ jobs:
                   --timeout 5m \
                   --cpu 1 \
                   --memory 512Mi \
+                  --set-env-vars "$ENV_VARS"
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.PROJECT_ID }}
