@@ -1,5 +1,5 @@
 name: Cloud Run Deployment Flow
-concurrency: ${{ github.event.repository.name }}-prod
+concurrency: ${{ github.event.repository.name }}-main
 on:
   push:
     branches:
@@ -51,13 +51,33 @@ jobs:
       - name: Authorize Docker push
         run: gcloud auth configure-docker
         
+      - name: Check Docker version and info
+        run: |
+          docker --version
+          docker info
+          ls -la
+          
+      - name: Confirm Dockerfile exists
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "Dockerfile exists"
+            cat Dockerfile | head -n 10
+          else
+            echo "Dockerfile does not exist in the current directory"
+            find . -name "Dockerfile" -type f
+            exit 1
+          fi
+        
       - name: Build and push Docker image
         run: |
+          echo "Building Docker image..."
           docker build -t gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }} .
+          echo "Pushing Docker image..."
           docker push gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }}
           
       - name: Create ENV File
         run: |
+          mkdir -p env
           echo "PROJECT_ID=${{ env.PROJECT_ID }}" >> ${{ env.ENV_FILE }}
           echo "SERVICE_NAME=${{ env.SERVICE_NAME }}" >> ${{ env.ENV_FILE }}
           echo "HOST=${{ env.HOST }}" >> ${{ env.ENV_FILE }}
@@ -79,7 +99,7 @@ jobs:
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v1
         with:
-          service: ${{ env.SERVICE_NAME }}
+          service: yohan-${{ env.SERVICE_NAME }}
           image: gcr.io/${{ env.PROJECT_ID }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }}
           region: ${{ env.REGION }}
           flags: |
@@ -87,6 +107,7 @@ jobs:
             --cpu=${{ env.CPU }}
             --platform=managed
             --allow-unauthenticated
+            --set-env-vars=ENV=${{ env.ENV }},DOMAIN=${{ env.DOMAIN }}
             
       - name: Show Output
         run: echo ${{ steps.deploy.outputs.url }}
