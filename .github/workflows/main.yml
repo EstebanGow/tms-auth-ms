@@ -5,7 +5,6 @@ on:
             - 'main'
 
 env:
-  
     SERVICE_NAME: tms-auth-ms
     PROJECT_ID: ${{ secrets.PROJECT_ID }}
     REGION: us-central1
@@ -26,10 +25,10 @@ jobs:
             branch: ${{ steps.extract_branch.outputs.branch }}
         steps:
             - name: Checkout
-              uses: actions/checkout@v2
+              uses: actions/checkout@v3
             - name: Extract branch name
               shell: bash
-              run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+              run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> $GITHUB_OUTPUT
               id: extract_branch
             - name: Set branch-based environment variables
               uses: iamtheyammer/branch-env-vars@v1.0.3
@@ -40,7 +39,7 @@ jobs:
                   ENV_FILE: |
                       main:ENV_PROD
             - name: Cache node modules
-              uses: actions/cache@v2
+              uses: actions/cache@v3
               with:
                   path: '**/node_modules'
                   key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
@@ -84,6 +83,5 @@ jobs:
                     --max-instances 2
             - name: Get URL Cloud Run
               shell: bash
-              run: echo "##[set-output name=url;]$(gcloud run services describe $SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)')"
+              run: echo "url=$(gcloud run services describe $SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)')" >> $GITHUB_OUTPUT
               id: extract_url
-   
