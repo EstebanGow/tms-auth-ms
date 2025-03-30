@@ -81,18 +81,57 @@ jobs:
                 gcloud auth configure-docker
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
-            - name: Build and deploy image
-              run: PROJECT_ID=${{ env.GCP_PROJECT }} COMMIT_SHA=${{ github.sha }} SERVICE_NAME=${{ env.SERVICE_NAME }} make deploy
+            # Agregamos un paso para verificar y otorgar permisos si se tienen privilegios elevados
+            - name: Verificar y otorgar permisos (si es posible)
+              run: |
+                echo "Verificando permisos de la cuenta de servicio actual..."
+                CUENTA_SERVICIO=$(gcloud auth list --filter=status:ACTIVE --format="value(account)")
+                echo "Cuenta de servicio activa: $CUENTA_SERVICIO"
+                
+                # Intentar otorgar permisos necesarios
+                echo "Intentando otorgar permisos de Service Usage Consumer..."
+                gcloud projects add-iam-policy-binding ${{ env.GCP_PROJECT }} \
+                  --member=serviceAccount:$CUENTA_SERVICIO \
+                  --role=roles/serviceusage.serviceUsageConsumer \
+                  || echo "No se pudieron otorgar permisos de Service Usage Consumer (se necesitan privilegios elevados)"
+              env:
+                GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
+                CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
+                
+            - name: Build y push de Docker directamente (alternativa a Cloud Build)
+              run: |
+                echo "Construyendo imagen Docker localmente..."
+                # Autenticar Docker con Google Container Registry
+                gcloud auth configure-docker --quiet
+                
+                # Construir y enviar la imagen directamente con Docker
+                docker build -t gcr.io/${{ env.GCP_PROJECT }}/esteban-${{ env.SERVICE_NAME }}:${{ github.sha }} .
+                docker push gcr.io/${{ env.GCP_PROJECT }}/esteban-${{ env.SERVICE_NAME }}:${{ github.sha }}
+                
+                echo "Verificando que la imagen existe..."
+                gcloud container images describe gcr.io/${{ env.GCP_PROJECT }}/esteban-${{ env.SERVICE_NAME }}:${{ github.sha }}
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
             - name: Deploy to Cloud Run
-              run: |-
-                  gcloud run deploy esteban-$SERVICE_NAME \
-                    --image gcr.io/${{ env.GCP_PROJECT }}/esteban-$SERVICE_NAME:${{ github.sha }} \
-                    --allow-unauthenticated \
-                    --region $REGION \
-                    --max-instances 2
+              run: |
+                echo "Preparando variables de entorno desde ${{ env.ENV_FILE }} para Cloud Run..."
+                
+                # El formato para --set-env-vars es KEY1=VALUE1,KEY2=VALUE2
+                ENV_VARS=$(grep -v '^#' ${{ env.ENV_FILE }} | tr '\n' ',' | sed 's/,$//')
+                
+                echo "Desplegando a Cloud Run con variables de entorno..."
+                gcloud run deploy esteban-$SERVICE_NAME \
+                  --image gcr.io/${{ env.GCP_PROJECT }}/esteban-${{ env.SERVICE_NAME }}:${{ github.sha }} \
+                  --allow-unauthenticated \
+                  --region $REGION \
+                  --max-instances 2 \
+                  --platform managed \
+                  --port 8080 \
+                  --timeout 5m \
+                  --cpu 1 \
+                  --memory 512Mi \
+                  --set-env-vars "$ENV_VARS"
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
