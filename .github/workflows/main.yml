@@ -82,28 +82,17 @@ jobs:
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
             - name: Build and deploy image
-              run: |
-                echo "Construyendo imagen para ${{ env.SERVICE_NAME }}..."
-                gcloud builds submit --project ${{ env.GCP_PROJECT }} --tag gcr.io/${{ env.GCP_PROJECT }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }} .
-                echo "Verificando que la imagen existe..."
-                gcloud container images describe gcr.io/${{ env.GCP_PROJECT }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }}
+              run: PROJECT_ID=${{ env.GCP_PROJECT }} COMMIT_SHA=${{ github.sha }} SERVICE_NAME=${{ env.SERVICE_NAME }} make deploy
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
             - name: Deploy to Cloud Run
-              run: |
-                echo "Desplegando a Cloud Run..."
-                gcloud run deploy yohan-$SERVICE_NAME \
-                  --image gcr.io/${{ env.GCP_PROJECT }}/yohan-${{ env.SERVICE_NAME }}:${{ github.sha }} \
-                  --allow-unauthenticated \
-                  --region $REGION \
-                  --max-instances 2 \
-                  --platform managed \
-                  --port 8080 \
-                  --timeout 5m \
-                  --cpu 1 \
-                  --memory 512Mi \
-                  --set-env-vars "PORT=8080"
+              run: |-
+                  gcloud run deploy yohan-$SERVICE_NAME \
+                    --image gcr.io/${{ env.GCP_PROJECT }}/yohan-$SERVICE_NAME:${{ github.sha }} \
+                    --allow-unauthenticated \
+                    --region $REGION \
+                    --max-instances 2
               env:
                 GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
                 CLOUDSDK_CORE_PROJECT: ${{ env.GCP_PROJECT }}
