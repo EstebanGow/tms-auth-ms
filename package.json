@@ -33,6 +33,7 @@
         "@google-cloud/pubsub": "^4.7.2",
         "@types/named-routes": "^2.0.5",
         "axios": "^1.7.7",
+        "bcrypt": "^5.1.1",
         "body-parser": "^1.20.3",
         "cm-idempotencia": "^1.4.6",
         "dotenv": "^16.4.5",
@@ -59,6 +60,7 @@
     "devDependencies": {
         "@commitlint/cli": "^19.5.0",
         "@commitlint/config-conventional": "19.5.0",
+        "@types/bcrypt": "^5.0.2",
         "@types/fastify-rate-limit": "^2.1.0",
         "@types/jest": "29.5.13",
         "@types/jsonwebtoken": "^9.0.9",
